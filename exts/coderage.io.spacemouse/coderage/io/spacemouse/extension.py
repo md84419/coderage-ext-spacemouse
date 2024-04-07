@@ -12,6 +12,7 @@ import omni.ui as ui
 import omni.usd
 from omni.kit.widget.viewport.api import ViewportAPI
 from omni.kit.viewport.window import ViewportWindow
+from omni.kit.viewport.utility import get_active_viewport
 from pxr import Usd, UsdGeom, Gf
 if platform.system() == 'Windows':
     omni.kit.pipapi.install("pywinusb")
@@ -22,13 +23,24 @@ UPDATE_TIME_MILLIS = 500
 
 
 class CoderageIoSpacemouseExtension(omni.ext.IExt):
-    def __init__(self):
+
+    def on_startup(self, ext_id):
         self._count = 0
         self.previous_time = None
         self.previous_state = None
-
-    def on_startup(self, ext_id):
         print("[coderage.io.spacemouse] coderage io spacemouse startup")
+
+        # Get the active camera for a Viewport (the active one)
+        self._camera_path = get_active_viewport().camera_path
+
+        # You can use USD api to set xformOps on the camera that is viewing
+        # https://openusd.org/dev/api/class_usd_geom_xform_op.html
+
+        # You can use usd.commands to do it
+        # omni.kit.commands.execute("TransformPrimSRTCommand", path = camera_path, new_translation = new_translation)
+
+        # You can use omni.kit.viewport.utility to do it
+        # omni.kit.viewport.utility.camera_state.ViewportCameraState(camera_path=camera_path).set_position_world(new_translation)
 
         self._window = ui.Window("Spacemouse debug", width=300, height=300)
         with self._window.frame:
@@ -190,28 +202,43 @@ class CoderageIoSpacemouseExtension(omni.ext.IExt):
             or state.y != 0
             or state.z != 0
         ):
-            # Based on code from
-            # https://github.com/mati-nvidia/developer-office-hours/blob/main/exts/maticodes.doh_2023_04_14/scripts/move_prim_forward.py
-            local_transformation: Gf.Matrix4d = usd_camera.GetLocalTransformation()
-            # Apply the local matrix to the start and end points of the camera's default forward vector (-Z)
-            a: Gf.Vec4d = Gf.Vec4d(0,0,0,1) * local_transformation
-            b: Gf.Vec4d = Gf.Vec4d(0,0,-10,1) * local_transformation
-            # Get the vector between those two points to get the camera's current forward vector
-            cam_fwd_vec = b-a
-            # Convert to Vec3 and then normalize to get unit vector
-            cam_fwd_unit_vec = Gf.Vec3d(cam_fwd_vec[:3]).GetNormalized()
-            # Multiply the forward direction vector with how far forward you want to move
-            forward_step = cam_fwd_unit_vec * 100
-            # Create a new matrix with the translation that you want to perform
-            offset_mat = Gf.Matrix4d()
-            offset_mat.SetTranslate(forward_step)
-            # Apply the translation to the current local transform
-            new_transform: Gf.Matrix4d = local_transformation * offset_mat
-            # Extract the new translation
-            translate: Gf.Vec3d = new_transform.ExtractTranslation()
+            import omni.kit.viewport.utility as vp_util
+            from omni.kit.viewport.utility.camera_state import ViewportCameraState as VpCamera
 
-            # Update the attribute - this next line hangs
-            active_camera_prim.GetAttribute("xformOp:translate").Set(translate)
+            cam_state = VpCamera()
+            # Get the current position and forward
+            cam_pos = cam_state.position_world
+            cam_target = cam_state.target_world
+            cam_fwd = cam_target - cam_pos
+            # Set the target to pos + dir * d
+            target = cam_pos + cam_fwd.GetNormalized() * -10
+            # OM-103904: Set rotate flag to False when call set_target_world here,
+            # otherwise it will change the camera's position in sometime
+            cam_state.set_target_world(target, False)
+            # # Based on code from
+            # # https://github.com/mati-nvidia/developer-office-hours/blob/main/exts/maticodes.doh_2023_04_14/scripts/move_prim_forward.py
+            # local_transformation: Gf.Matrix4d = usd_camera.GetLocalTransformation()
+            # # Apply the local matrix to the start and end points of the camera's default forward vector (-Z)
+            # a: Gf.Vec4d = Gf.Vec4d(0,0,0,1) * local_transformation
+            # b: Gf.Vec4d = Gf.Vec4d(0,0,-10,1) * local_transformation
+            # # Get the vector between those two points to get the camera's current forward vector
+            # cam_fwd_vec = b-a
+            # # Convert to Vec3 and then normalize to get unit vector
+            # cam_fwd_unit_vec = Gf.Vec3d(cam_fwd_vec[:3]).GetNormalized()
+            # # Multiply the forward direction vector with how far forward you want to move
+            # forward_step = cam_fwd_unit_vec * 100
+            # # Create a new matrix with the translation that you want to perform
+            # offset_mat = Gf.Matrix4d()
+            # offset_mat.SetTranslate(forward_step)
+            # # Apply the translation to the current local transform
+            # new_transform: Gf.Matrix4d = local_transformation * offset_mat
+            # # Extract the new translation
+            # translate: Gf.Vec3d = new_transform.ExtractTranslation()
+
+            # carb.log_info(f"Before: {active_camera_prim.GetAttribute('xformOp:translate').Get()}")
+            # # Update the attribute - this next line hangs
+            # active_camera_prim.GetAttribute("xformOp:translate").Set(translate)
+            # carb.log_info(f"After: {active_camera_prim.GetAttribute('xformOp:translate').Get()}")
 
 
     def on_shutdown(self):
