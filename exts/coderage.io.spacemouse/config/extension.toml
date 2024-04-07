@@ -1,0 +1,42 @@
+[package]
+version = "0.0.1"
+authors = ["CodeRage"]
+title = "Spacemouse Driver"
+description="Integration of 3DConnexion's spacemouse with Omniverse."
+category = "other"
+keywords = ["kit", "io", "spacemouse", "3dconnexion", "spacenavigator"]
+readme  = "docs/README.md"
+repository = "https://github.com/md84419/coderage-ext-spacemouse.git"
+icon = "data/icon.png"
+preview_image = "data/preview.png"
+changelog="docs/CHANGELOG.md"
+feature=true
+
+# Use omni.ui to build simple UI
+[dependencies]
+"omni.kit.uiapp" = {}
+"omni.kit.pipapi" = {}
+#"omni.kit.window.viewport" = {}
+"omni.kit.viewport.window" = {}
+
+[python.pipapi]
+requirements = [
+    # "pywinusb",       # Required by spacenavigator when on Windows. See extension.py.
+
+    # The next line is equivilent to .\app\kit\python\python.exe -m pip install "spacenavigator@git+https://github.com/md84419/pyspacenavigator#egg=spacenavigator.py-0.2.3"
+    "spacenavigator@git+https://github.com/md84419/pyspacenavigator#egg=spacenavigator.py-0.2.3==0.2.3"
+]
+modules = [
+    "spacenavigator"
+]
+use_online_index = true
+
+# Main python module this extension provides, it will be publicly available as "import coderage.io.spacemouse".
+[[python.module]]
+name = "coderage.io.spacemouse"
+
+[[test]]
+# Extra dependencies only to be used during test run
+dependencies = [
+    "omni.kit.ui_test" # UI testing extension
+]
